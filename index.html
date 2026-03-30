@@ -1,176 +1,210 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JAMB CBT Pro</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Multiplayer Tic-Tac-Toe</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --card-color: #16213e;
+            --text-color: #e94560;
+            --cell-size: 100px;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Prevents scrolling on mobile */
+        }
+
+        .game-container {
+            text-align: center;
+        }
+
+        h1 { color: var(--text-color); margin-top: 0; margin-bottom: 10px; }
+
+        .scoreboard {
+            display: flex;
+            justify-content: space-around;
+            background: #0f3460;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        #status {
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            height: 1.5rem; /* Keeps layout from jumping */
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, var(--cell-size));
+            grid-template-rows: repeat(3, var(--cell-size));
+            gap: 10px;
+            background-color: #0f3460;
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background-color: var(--card-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .cell:active { transform: scale(0.95); }
+        .cell.taken { cursor: not-allowed; }
+
+        .cell[data-symbol="X"] { color: #00d2ff; }
+        .cell[data-symbol="O"] { color: var(--text-color); }
+    </style>
 </head>
 <body>
-  <div class="top-bar">
-    <h2>📘 JAMB CBT Pro</h2>
-    <div>
-      <span id="userDisplay" style="margin-right:15px;"></span>
-      <button id="themeToggle" onclick="toggleMode()">🌙</button>
-    </div>
-  </div>
-
-  <!-- Login Screen -->
-  <div id="loginScreen" class="card">
-    <h3>Login to Start</h3>
-    <input type="text" id="studentName" placeholder="Enter your name" required>
-    <button onclick="login()">Login</button>
-  </div>
-
-  <!-- Start Screen (appears after login) -->
-  <div id="startScreen" class="card hidden">
-    <h3>📅 Select Exam Year</h3>
-    <select id="examYear"></select>
-
-    <h3>⚙️ Exam Settings</h3>
-    <div class="setting-group">
-      <label>Questions per subject:</label>
-      <input type="number" id="questionsPerSubject" min="1" max="60" value="40">
-    </div>
-    <div class="setting-group">
-      <label>Time limit (minutes):</label>
-      <input type="number" id="examMinutes" min="1" max="180" value="30">
-    </div>
-
-    <h3>📚 Select Subjects (English is compulsory)</h3>
-    <div class="subject-group">
-      <label>English</label>
-      <input type="text" value="Use of English" disabled>
-    </div>
-    <div class="subject-group">
-      <label>Additional Subject 1 (optional)</label>
-      <select id="subject2" class="subject-select">
-        <option value="">-- None --</option>
-        <option>Mathematics</option>
-        <option>Physics</option>
-        <option>Chemistry</option>
-        <option>Biology</option>
-        <option>Economics</option>
-        <option>Literature</option>
-        <option>Government</option>
-        <option>History</option>
-      </select>
-    </div>
-    <div class="subject-group">
-      <label>Additional Subject 2 (optional)</label>
-      <select id="subject3" class="subject-select">
-        <option value="">-- None --</option>
-        <option>Mathematics</option>
-        <option>Physics</option>
-        <option>Chemistry</option>
-        <option>Biology</option>
-        <option>Economics</option>
-        <option>Literature</option>
-        <option>Government</option>
-        <option>History</option>
-      </select>
-    </div>
-    <div class="subject-group">
-      <label>Additional Subject 3 (optional)</label>
-      <select id="subject4" class="subject-select">
-        <option value="">-- None --</option>
-        <option>Mathematics</option>
-        <option>Physics</option>
-        <option>Chemistry</option>
-        <option>Biology</option>
-        <option>Economics</option>
-        <option>Literature</option>
-        <option>Government</option>
-        <option>History</option>
-      </select>
-    </div>
-
-    <div class="instruction-box">
-      <h4>📋 Instructions</h4>
-      <ul>
-        <li>You choose the number of questions per subject.</li>
-        <li>English is always included. Pick 0–3 additional subjects.</li>
-        <li>Set your own time limit.</li>
-        <li>You can hide/show the question navigator during the exam.</li>
-        <li>Answers are saved automatically.</li>
-      </ul>
-    </div>
-
-    <button onclick="startExam()">Start Exam</button>
-  </div>
-
-  <!-- Exam Screen -->
-  <div id="examScreen" class="hidden">
-    <div class="exam-header">
-      <div id="currentSubject"></div>
-      <div id="timer">30:00</div>
-      <div class="progress-container">
-        <div id="progressBar"></div>
-      </div>
-      <div id="progressText">Answered: 0 | Remaining: 0</div>
-      <button id="togglePanelBtn" onclick="toggleNumberPanel()">📋 Hide</button>
-    </div>
-
-    <div class="main" id="examMain">
-      <div class="question-box">
-        <h3 id="questionText"></h3>
-        <div id="options" class="options-container"></div>
-        <div class="action-buttons">
-          <button onclick="clearAnswer()">🗑️ Clear</button>
-          <button onclick="markForReview()">⭐ Review</button>
-          <button onclick="confirmSubmit()">📤 Submit</button>
+    <div class="game-container">
+        <h1>Tic-Tac-Toe</h1>
+        
+        <div class="scoreboard">
+            <div>X Wins: <span id="scoreX">0</span></div>
+            <div>O Wins: <span id="scoreO">0</span></div>
         </div>
-      </div>
 
-      <div class="number-panel" id="numberPanel"></div>
+        <div id="status">Connecting to server...</div>
+        
+        <div class="board" id="board">
+            <div class="cell" data-index="0"></div>
+            <div class="cell" data-index="1"></div>
+            <div class="cell" data-index="2"></div>
+            <div class="cell" data-index="3"></div>
+            <div class="cell" data-index="4"></div>
+            <div class="cell" data-index="5"></div>
+            <div class="cell" data-index="6"></div>
+            <div class="cell" data-index="7"></div>
+            <div class="cell" data-index="8"></div>
+        </div>
     </div>
 
-    <div class="nav-buttons">
-      <button onclick="prevQuestion()">◀ Previous</button>
-      <button onclick="nextQuestion()">Next ▶</button>
-    </div>
-  </div>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    
+    <script>
+        // 1. Connect to your Render backend
+        const socket = io("https://tictactoe-bt0d.onrender.com", {
+            transports: ["websocket", "polling"]
+        });
 
-  <!-- Result Screen -->
-  <div id="resultScreen" class="card hidden">
-    <h2>📊 Exam Result</h2>
-    <div id="studentInfo"></div>
-    <div id="aiHint" class="ai-hint"></div>
-    <div id="summaryBox"></div>
+        const statusDisplay = document.getElementById('status');
+        const cells = document.querySelectorAll('.cell');
+        const scoreX = document.getElementById('scoreX');
+        const scoreO = document.getElementById('scoreO');
 
-    <div class="leaderboard">
-      <h3>🏆 Leaderboard (Top 10)</h3>
-      <div id="leaderboardList"></div>
-    </div>
+        let mySymbol = null;
+        let isMyTurn = false;
 
-    <hr>
-    <button onclick="downloadSlip()">📥 Download Result Slip</button>
-    <button onclick="reviewAnswers()">🔍 Review Answers</button>
-    <button onclick="logout()">🚪 Logout</button>
-    <button onclick="location.reload()">🔄 Retake Exam</button>
+        // 2. Ask for Room ID as soon as the page loads
+        const roomID = prompt("Enter a Room Name to join (e.g., 'room1'):") || "lobby";
+        socket.emit('joinRoom', roomID);
 
-    <div id="resultDetails" class="result-details hidden"></div>
-  </div>
+        // 3. Handle Initialization (Matches your server's socket.emit('init', {symbol, scores}))
+        socket.on('init', ({ symbol, scores }) => {
+            mySymbol = symbol;
+            isMyTurn = (symbol === 'X'); // X always goes first in a fresh room
+            
+            // Populate scores from DB
+            scoreX.innerText = scores.x_wins;
+            scoreO.innerText = scores.o_wins;
+            
+            updateStatus();
+        });
 
+        // Update the text at the top so the player knows what to do
+        function updateStatus() {
+            if (isMyTurn) {
+                statusDisplay.innerText = `Your turn (${mySymbol})`;
+                statusDisplay.style.color = "#00ff00";
+            } else {
+                statusDisplay.innerText = "Opponent's turn...";
+                statusDisplay.style.color = "white";
+            }
+        }
 
-<!-- Question bank files -->
-<script src="2024.js"></script>
-<script src="2024-physics.js"></script>
-<script src="2024-chemistry.js"></script>
-<script src="2024-mathematics.js"></script>
-<script src="2024-biology.js"></script>
-<script src="2024-english.js"></script>
+        // 4. Handle Clicks on the Board
+        cells.forEach(cell => {
+            cell.addEventListener('click', (e) => {
+                const index = e.target.getAttribute('data-index');
+                
+                // Block the click if it's not our turn, or if the cell is full
+                if (!isMyTurn || e.target.innerText !== '') return;
 
-<!-- Arts and Commercial Subjects -->
-<script src="2024-government.js"></script>
-<script src="2024-history.js"></script>
-<script src="2024-economics.js"></script>
-<script src="2024-commerce.js"></script>
-<script src="2024-accounts.js"></script>
-<script src="2024-literature.js"></script>
-<script src="2024-islamic-studies.js"></script>
+                // Tell the server we moved
+                socket.emit('makeMove', index);
+                
+                // Immediately lock the board for us
+                isMyTurn = false;
+                updateStatus();
+            });
+        });
 
-<script src="2023.js"></script>
-<script src="script.js"></script>
+        // 5. Handle Board Updates from the Server
+        socket.on('updateBoard', ({ index, symbol }) => {
+            const cell = cells[index];
+            cell.innerText = symbol;
+            cell.setAttribute('data-symbol', symbol);
+            cell.classList.add('taken');
+
+            // If the other player just moved, it is now our turn
+            if (symbol !== mySymbol) {
+                isMyTurn = true;
+                updateStatus();
+            }
+        });
+
+        // 6. Handle Game Over Logic
+        socket.on('gameOver', ({ winner }) => {
+            setTimeout(() => {
+                if (winner === 'Draw') {
+                    alert("It's a Draw!");
+                } else {
+                    alert(`Player ${winner} wins!`);
+                    
+                    // Visually update the score immediately
+                    if (winner === 'X') scoreX.innerText = parseInt(scoreX.innerText) + 1;
+                    if (winner === 'O') scoreO.innerText = parseInt(scoreO.innerText) + 1;
+                }
+
+                // Clean the board for the next round
+                cells.forEach(cell => {
+                    cell.innerText = '';
+                    cell.classList.remove('taken');
+                    cell.removeAttribute('data-symbol');
+                });
+
+                // Based on your server logic, the player who made the last move gets to go first in the next round
+                // because the server doesn't toggle 'room.turn' on a winning move.
+                isMyTurn = (mySymbol === winner || winner === 'Draw' && !isMyTurn);
+                updateStatus();
+                
+            }, 100); // Slight delay so the final X/O draws on the screen before the alert pops up
+        });
+
+    </script>
 </body>
-</html>
+          </html>
+  
