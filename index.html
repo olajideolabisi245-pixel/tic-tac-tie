@@ -10,52 +10,50 @@
             --card-color: #16213e;
             --text-color: #e94560;
             --cell-size: 100px;
+            --x-color: #00d2ff;
+            --o-color: #e94560;
         }
 
         body {
             background-color: var(--bg-color);
             color: white;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', system-ui, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             margin: 0;
-            overflow: hidden; /* Prevents scrolling on mobile */
+            overflow: hidden;
         }
 
-        .game-container {
-            text-align: center;
-        }
-
-        h1 { color: var(--text-color); margin-top: 0; margin-bottom: 10px; }
+        .game-container { text-align: center; width: 100%; max-width: 400px; }
+        h1 { color: var(--text-color); margin: 0 0 10px 0; }
 
         .scoreboard {
             display: flex;
             justify-content: space-around;
             background: #0f3460;
-            padding: 10px;
+            padding: 15px;
             margin-bottom: 15px;
             border-radius: 8px;
-            font-size: 1.2rem;
             font-weight: bold;
         }
 
         #status {
             margin-bottom: 15px;
-            font-size: 1.2rem;
-            font-weight: bold;
-            height: 1.5rem; /* Keeps layout from jumping */
+            font-size: 1.1rem;
+            min-height: 1.5rem;
         }
 
         .board {
             display: grid;
-            grid-template-columns: repeat(3, var(--cell-size));
-            grid-template-rows: repeat(3, var(--cell-size));
+            grid-template-columns: repeat(3, 1fr);
             gap: 10px;
             background-color: #0f3460;
             padding: 10px;
             border-radius: 10px;
+            margin: 0 auto;
+            width: 320px;
         }
 
         .cell {
@@ -65,29 +63,31 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 3rem;
+            font-size: 2.5rem;
             font-weight: bold;
             cursor: pointer;
-            transition: background 0.2s;
+            border-radius: 4px;
+            transition: transform 0.1s, background 0.2s;
         }
 
+        .cell:hover { background-color: #1f2d4d; }
         .cell:active { transform: scale(0.95); }
-        .cell.taken { cursor: not-allowed; }
-
-        .cell[data-symbol="X"] { color: #00d2ff; }
-        .cell[data-symbol="O"] { color: var(--text-color); }
+        .cell.taken { cursor: default; }
+        .cell[data-symbol="X"] { color: var(--x-color); }
+        .cell[data-symbol="O"] { color: var(--o-color); }
     </style>
 </head>
 <body>
+
     <div class="game-container">
         <h1>Tic-Tac-Toe</h1>
         
         <div class="scoreboard">
-            <div>X Wins: <span id="scoreX">0</span></div>
-            <div>O Wins: <span id="scoreO">0</span></div>
+            <div style="color: var(--x-color)">X: <span id="scoreX">0</span></div>
+            <div style="color: var(--o-color)">O: <span id="scoreO">0</span></div>
         </div>
 
-        <div id="status">Connecting to server...</div>
+        <div id="status">Connecting...</div>
         
         <div class="board" id="board">
             <div class="cell" data-index="0"></div>
@@ -103,108 +103,96 @@
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    
     <script>
-        // 1. Connect to your Render backend
-        const socket = io("https://tictactoe-bt0d.onrender.com", {
-            transports: ["websocket", "polling"]
-        });
+        const socket = io("https://tictactoe-bt0d.onrender.com");
 
         const statusDisplay = document.getElementById('status');
         const cells = document.querySelectorAll('.cell');
         const scoreX = document.getElementById('scoreX');
         const scoreO = document.getElementById('scoreO');
 
-        let mySymbol = null;
-        let isMyTurn = false;
+        let gameState = {
+            mySymbol: null,
+            isMyTurn: false,
+            roomID: null,
+            active: false
+        };
 
-        // 2. Ask for Room ID as soon as the page loads
-        const roomID = prompt("Enter a Room Name to join (e.g., 'room1'):") || "lobby";
+        const roomID = prompt("Join Room Name:") || "lobby";
+        gameState.roomID = roomID;
         socket.emit('joinRoom', roomID);
 
-        // 3. Handle Initialization (Matches your server's socket.emit('init', {symbol, scores}))
         socket.on('init', ({ symbol, scores }) => {
-            mySymbol = symbol;
-            isMyTurn = (symbol === 'X'); // X always goes first in a fresh room
-            
-            // Populate scores from DB
+            gameState.mySymbol = symbol;
             scoreX.innerText = scores.x_wins;
             scoreO.innerText = scores.o_wins;
-            
+            updateStatus("Waiting for opponent...");
+        });
+
+        socket.on('gameStart', ({ turn }) => {
+            gameState.active = true;
+            gameState.isMyTurn = (turn === gameState.mySymbol);
             updateStatus();
         });
 
-        // Update the text at the top so the player knows what to do
-        function updateStatus() {
-            if (isMyTurn) {
-                statusDisplay.innerText = `Your turn (${mySymbol})`;
+        function updateStatus(msg) {
+            if (msg) {
+                statusDisplay.innerText = msg;
+                statusDisplay.style.color = "white";
+                return;
+            }
+            if (gameState.isMyTurn) {
+                statusDisplay.innerText = `Your Turn (${gameState.mySymbol})`;
                 statusDisplay.style.color = "#00ff00";
             } else {
-                statusDisplay.innerText = "Opponent's turn...";
+                statusDisplay.innerText = "Opponent's Turn...";
                 statusDisplay.style.color = "white";
             }
         }
 
-        // 4. Handle Clicks on the Board
         cells.forEach(cell => {
-            cell.addEventListener('click', (e) => {
-                const index = e.target.getAttribute('data-index');
-                
-                // Block the click if it's not our turn, or if the cell is full
-                if (!isMyTurn || e.target.innerText !== '') return;
+            cell.addEventListener('click', () => {
+                const index = cell.getAttribute('data-index');
+                if (!gameState.active || !gameState.isMyTurn || cell.innerText !== '') return;
 
-                // Tell the server we moved
-                socket.emit('makeMove', index);
-                
-                // Immediately lock the board for us
-                isMyTurn = false;
+                socket.emit('makeMove', { roomID: gameState.roomID, index });
+                gameState.isMyTurn = false;
                 updateStatus();
             });
         });
 
-        // 5. Handle Board Updates from the Server
-        socket.on('updateBoard', ({ index, symbol }) => {
+        socket.on('updateBoard', ({ index, symbol, nextTurn }) => {
             const cell = cells[index];
             cell.innerText = symbol;
             cell.setAttribute('data-symbol', symbol);
             cell.classList.add('taken');
-
-            // If the other player just moved, it is now our turn
-            if (symbol !== mySymbol) {
-                isMyTurn = true;
-                updateStatus();
-            }
+            
+            gameState.isMyTurn = (nextTurn === gameState.mySymbol);
+            updateStatus();
         });
 
-        // 6. Handle Game Over Logic
-        socket.on('gameOver', ({ winner }) => {
+        socket.on('gameOver', ({ winner, scores }) => {
+            gameState.active = false;
             setTimeout(() => {
-                if (winner === 'Draw') {
-                    alert("It's a Draw!");
-                } else {
-                    alert(`Player ${winner} wins!`);
-                    
-                    // Visually update the score immediately
-                    if (winner === 'X') scoreX.innerText = parseInt(scoreX.innerText) + 1;
-                    if (winner === 'O') scoreO.innerText = parseInt(scoreO.innerText) + 1;
-                }
-
-                // Clean the board for the next round
-                cells.forEach(cell => {
-                    cell.innerText = '';
-                    cell.classList.remove('taken');
-                    cell.removeAttribute('data-symbol');
-                });
-
-                // Based on your server logic, the player who made the last move gets to go first in the next round
-                // because the server doesn't toggle 'room.turn' on a winning move.
-                isMyTurn = (mySymbol === winner || winner === 'Draw' && !isMyTurn);
-                updateStatus();
+                alert(winner === 'Draw' ? "It's a Draw!" : `Player ${winner} Wins!`);
                 
-            }, 100); // Slight delay so the final X/O draws on the screen before the alert pops up
+                // Update scores
+                scoreX.innerText = scores.x_wins;
+                scoreO.innerText = scores.o_wins;
+
+                // Reset UI
+                cells.forEach(c => {
+                    c.innerText = '';
+                    c.classList.remove('taken');
+                    c.removeAttribute('data-symbol');
+                });
+            }, 50);
         });
 
+        socket.on('opponentLeft', () => {
+            updateStatus("Opponent disconnected.");
+            gameState.active = false;
+        });
     </script>
 </body>
-          </html>
-  
+</html>
