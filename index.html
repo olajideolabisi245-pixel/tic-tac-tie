@@ -1,198 +1,50 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Multiplayer Tic-Tac-Toe</title>
+    <title>Tic Tac Toe Mobile</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        :root {
-            --bg-color: #1a1a2e;
-            --card-color: #16213e;
-            --text-color: #e94560;
-            --cell-size: 100px;
-            --x-color: #00d2ff;
-            --o-color: #e94560;
-        }
-
-        body {
-            background-color: var(--bg-color);
-            color: white;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            overflow: hidden;
-        }
-
-        .game-container { text-align: center; width: 100%; max-width: 400px; }
-        h1 { color: var(--text-color); margin: 0 0 10px 0; }
-
-        .scoreboard {
-            display: flex;
-            justify-content: space-around;
-            background: #0f3460;
-            padding: 15px;
-            margin-bottom: 15px;
-            border-radius: 8px;
-            font-weight: bold;
-        }
-
-        #status {
-            margin-bottom: 15px;
-            font-size: 1.1rem;
-            min-height: 1.5rem;
-        }
-
-        .board {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            background-color: #0f3460;
-            padding: 10px;
-            border-radius: 10px;
-            margin: 0 auto;
-            width: 320px;
-        }
-
-        .cell {
-            width: var(--cell-size);
-            height: var(--cell-size);
-            background-color: var(--card-color);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 2.5rem;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 4px;
-            transition: transform 0.1s, background 0.2s;
-        }
-
-        .cell:hover { background-color: #1f2d4d; }
-        .cell:active { transform: scale(0.95); }
-        .cell.taken { cursor: default; }
-        .cell[data-symbol="X"] { color: var(--x-color); }
-        .cell[data-symbol="O"] { color: var(--o-color); }
+        body { font-family: sans-serif; text-align: center; background: #121212; color: white; }
+        .grid { display: grid; grid-template-columns: repeat(3, 100px); gap: 5px; justify-content: center; margin-top: 20px; }
+        .cell { width: 100px; height: 100px; background: #222; border: 1px solid #444; font-size: 2rem; display: flex; align-items: center; justify-content: center; color: cyan; }
+        .cell:active { background: #333; }
+        button { margin-top: 20px; padding: 10px 20px; font-size: 1rem; border-radius: 8px; border: none; background: #ff4757; color: white; }
     </style>
 </head>
 <body>
+    <h2>Tic-Tac-Toe</h2>
+    <p id="status">Connecting...</p>
+    <div class="grid" id="grid"></div>
+    <button onclick="reset()">Reset Game</button>
 
-    <div class="game-container">
-        <h1>Tic-Tac-Toe</h1>
-        
-        <div class="scoreboard">
-            <div style="color: var(--x-color)">X: <span id="scoreX">0</span></div>
-            <div style="color: var(--o-color)">O: <span id="scoreO">0</span></div>
-        </div>
-
-        <div id="status">Connecting...</div>
-        
-        <div class="board" id="board">
-            <div class="cell" data-index="0"></div>
-            <div class="cell" data-index="1"></div>
-            <div class="cell" data-index="2"></div>
-            <div class="cell" data-index="3"></div>
-            <div class="cell" data-index="4"></div>
-            <div class="cell" data-index="5"></div>
-            <div class="cell" data-index="6"></div>
-            <div class="cell" data-index="7"></div>
-            <div class="cell" data-index="8"></div>
-        </div>
-    </div>
-
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        const socket = io("https://tictactoe-bt0d.onrender.com");
+        // REPLACE THIS with your Render URL
+        const SERVER_URL = "https://your-project-name.onrender.com"; 
+        const socket = io(SERVER_URL);
+        const grid = document.getElementById('grid');
+        const status = document.getElementById('status');
 
-        const statusDisplay = document.getElementById('status');
-        const cells = document.querySelectorAll('.cell');
-        const scoreX = document.getElementById('scoreX');
-        const scoreO = document.getElementById('scoreO');
-
-        let gameState = {
-            mySymbol: null,
-            isMyTurn: false,
-            roomID: null,
-            active: false
-        };
-
-        const roomID = prompt("Join Room Name:") || "lobby";
-        gameState.roomID = roomID;
-        socket.emit('joinRoom', roomID);
-
-        socket.on('init', ({ symbol, scores }) => {
-            gameState.mySymbol = symbol;
-            scoreX.innerText = scores.x_wins;
-            scoreO.innerText = scores.o_wins;
-            updateStatus("Waiting for opponent...");
-        });
-
-        socket.on('gameStart', ({ turn }) => {
-            gameState.active = true;
-            gameState.isMyTurn = (turn === gameState.mySymbol);
-            updateStatus();
-        });
-
-        function updateStatus(msg) {
-            if (msg) {
-                statusDisplay.innerText = msg;
-                statusDisplay.style.color = "white";
-                return;
-            }
-            if (gameState.isMyTurn) {
-                statusDisplay.innerText = `Your Turn (${gameState.mySymbol})`;
-                statusDisplay.style.color = "#00ff00";
-            } else {
-                statusDisplay.innerText = "Opponent's Turn...";
-                statusDisplay.style.color = "white";
-            }
+        // Create the 9 cells
+        for (let i = 0; i < 9; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.onclick = () => socket.emit('move', i);
+            grid.appendChild(cell);
         }
 
-        cells.forEach(cell => {
-            cell.addEventListener('click', () => {
-                const index = cell.getAttribute('data-index');
-                if (!gameState.active || !gameState.isMyTurn || cell.innerText !== '') return;
-
-                socket.emit('makeMove', { roomID: gameState.roomID, index });
-                gameState.isMyTurn = false;
-                updateStatus();
+        socket.on('update', (data) => {
+            status.innerText = `Next Player: ${data.xIsNext ? 'X' : 'O'}`;
+            const cells = document.querySelectorAll('.cell');
+            data.board.forEach((val, i) => {
+                cells[i].innerText = val || '';
+                cells[i].style.color = val === 'X' ? '#ff4757' : '#2ed573';
             });
         });
 
-        socket.on('updateBoard', ({ index, symbol, nextTurn }) => {
-            const cell = cells[index];
-            cell.innerText = symbol;
-            cell.setAttribute('data-symbol', symbol);
-            cell.classList.add('taken');
-            
-            gameState.isMyTurn = (nextTurn === gameState.mySymbol);
-            updateStatus();
-        });
-
-        socket.on('gameOver', ({ winner, scores }) => {
-            gameState.active = false;
-            setTimeout(() => {
-                alert(winner === 'Draw' ? "It's a Draw!" : `Player ${winner} Wins!`);
-                
-                // Update scores
-                scoreX.innerText = scores.x_wins;
-                scoreO.innerText = scores.o_wins;
-
-                // Reset UI
-                cells.forEach(c => {
-                    c.innerText = '';
-                    c.classList.remove('taken');
-                    c.removeAttribute('data-symbol');
-                });
-            }, 50);
-        });
-
-        socket.on('opponentLeft', () => {
-            updateStatus("Opponent disconnected.");
-            gameState.active = false;
-        });
+        function reset() {
+            socket.emit('reset');
+        }
     </script>
 </body>
 </html>
