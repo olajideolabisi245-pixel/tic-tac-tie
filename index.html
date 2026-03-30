@@ -1,50 +1,129 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Tic Tac Toe Mobile</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pro Tic-Tac-Toe</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #121212; color: white; }
-        .grid { display: grid; grid-template-columns: repeat(3, 100px); gap: 5px; justify-content: center; margin-top: 20px; }
-        .cell { width: 100px; height: 100px; background: #222; border: 1px solid #444; font-size: 2rem; display: flex; align-items: center; justify-content: center; color: cyan; }
-        .cell:active { background: #333; }
-        button { margin-top: 20px; padding: 10px 20px; font-size: 1rem; border-radius: 8px; border: none; background: #ff4757; color: white; }
+        :root { --bg: #0f172a; --text: #f8fafc; --primary: #3b82f6; --x-color: #ef4444; --o-color: #10b981; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); text-align: center; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        /* Lobby UI */
+        #lobby { display: flex; flex-direction: column; gap: 10px; margin-top: 50px; }
+        input { padding: 12px; font-size: 1rem; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: white; outline: none; text-align: center; }
+        button { padding: 12px 24px; font-size: 1rem; font-weight: bold; border-radius: 8px; border: none; background: var(--primary); color: white; cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.95); opacity: 0.8; }
+        
+        /* Game UI */
+        #gameArea { display: none; margin-top: 20px; }
+        .info-panel { background: #1e293b; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .grid { display: grid; grid-template-columns: repeat(3, 90px); gap: 8px; justify-content: center; }
+        .cell { width: 90px; height: 90px; background: #1e293b; border-radius: 12px; font-size: 2.5rem; font-weight: bold; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: background 0.2s; }
+        .cell:active { background: #334155; }
+        
+        /* Modals/Alerts */
+        #notification { color: #facc15; font-weight: bold; margin-top: 15px; height: 20px; }
     </style>
 </head>
 <body>
-    <h2>Tic-Tac-Toe</h2>
-    <p id="status">Connecting...</p>
-    <div class="grid" id="grid"></div>
-    <button onclick="reset()">Reset Game</button>
+
+    <h2>Pro Tic-Tac-Toe</h2>
+    
+    <div id="lobby">
+        <input type="text" id="roomInput" placeholder="Enter Room Code" autocomplete="off">
+        <button onclick="joinRoom()">Join / Create Room</button>
+        <div id="lobbyError" style="color: #ef4444; margin-top: 10px;"></div>
+    </div>
+
+    <div id="gameArea">
+        <div class="info-panel">
+            <div id="roomDisplay">Room: ---</div>
+            <div id="playerDisplay">You are: ---</div>
+            <div id="statusDisplay">Waiting for opponent...</div>
+        </div>
+        <div class="grid" id="grid"></div>
+        <div id="notification"></div>
+        <button onclick="location.reload()" style="margin-top: 20px; background: #475569;">Leave Room</button>
+    </div>
 
     <script>
-        // REPLACE THIS with your Render URL
-        const SERVER_URL = "https://tictactoe-bt0d.onrender.com"; 
-        const socket = io(SERVER_URL);
-        const grid = document.getElementById('grid');
-        const status = document.getElementById('status');
+        // UPDATE TO YOUR RENDER URL IN PRODUCTION
+        const socket = io("https://tictactoe-bt0d.onrender.com"); 
+        
+        let mySymbol = '';
+        let currentRoom = '';
 
-        // Create the 9 cells
+        // DOM Elements
+        const lobby = document.getElementById('lobby');
+        const gameArea = document.getElementById('gameArea');
+        const grid = document.getElementById('grid');
+        const roomInput = document.getElementById('roomInput');
+        const statusDisplay = document.getElementById('statusDisplay');
+        const playerDisplay = document.getElementById('playerDisplay');
+        const roomDisplay = document.getElementById('roomDisplay');
+        const notification = document.getElementById('notification');
+
+        // Initialize Board UI
         for (let i = 0; i < 9; i++) {
             const cell = document.createElement('div');
             cell.className = 'cell';
-            cell.onclick = () => socket.emit('move', i);
+            cell.onclick = () => socket.emit('makeMove', { roomId: currentRoom, index: i });
             grid.appendChild(cell);
         }
 
-        socket.on('update', (data) => {
-            status.innerText = `Next Player: ${data.xIsNext ? 'X' : 'O'}`;
+        function joinRoom() {
+            const roomCode = roomInput.value.trim().toUpperCase();
+            if (!roomCode) return;
+            currentRoom = roomCode;
+            socket.emit('joinRoom', currentRoom);
+        }
+
+        // Socket Listeners
+        socket.on('joined', (data) => {
+            mySymbol = data.symbol;
+            lobby.style.display = 'none';
+            gameArea.style.display = 'block';
+            roomDisplay.innerText = `Room: ${data.roomId}`;
+            playerDisplay.innerText = `You are: Player ${mySymbol}`;
+            playerDisplay.style.color = mySymbol === 'X' ? 'var(--x-color)' : 'var(--o-color)';
+        });
+
+        socket.on('gameState', (data) => {
+            // Update Board
             const cells = document.querySelectorAll('.cell');
             data.board.forEach((val, i) => {
                 cells[i].innerText = val || '';
-                cells[i].style.color = val === 'X' ? '#ff4757' : '#2ed573';
+                cells[i].style.color = val === 'X' ? 'var(--x-color)' : 'var(--o-color)';
             });
+
+            // Update Game Status
+            if (data.playersCount < 2) {
+                statusDisplay.innerText = "Waiting for opponent to join...";
+                statusDisplay.style.color = "#facc15";
+            } else if (data.winner) {
+                if (data.winner === 'Draw') {
+                    statusDisplay.innerText = "It's a Draw!";
+                    statusDisplay.style.color = "white";
+                } else {
+                    statusDisplay.innerText = `Player ${data.winner} Wins!`;
+                    statusDisplay.style.color = data.winner === mySymbol ? "var(--o-color)" : "var(--x-color)";
+                }
+            } else {
+                const isMyTurn = data.currentTurn === mySymbol;
+                statusDisplay.innerText = isMyTurn ? "Your Turn!" : "Opponent's Turn...";
+                statusDisplay.style.color = isMyTurn ? "var(--o-color)" : "#94a3b8";
+            }
         });
 
-        function reset() {
-            socket.emit('reset');
-        }
+        socket.on('playerLeft', (msg) => {
+            notification.innerText = msg;
+            statusDisplay.innerText = "Game Over - Opponent Fled";
+        });
+
+        socket.on('error', (msg) => {
+            document.getElementById('lobbyError').innerText = msg;
+        });
     </script>
 </body>
 </html>
