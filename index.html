@@ -9,20 +9,27 @@
         :root { --bg: #0f172a; --text: #f8fafc; --primary: #3b82f6; --x-color: #ef4444; --o-color: #10b981; }
         body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); text-align: center; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         
-        /* Lobby UI */
+        /* Lobby */
         #lobby { display: flex; flex-direction: column; gap: 10px; margin-top: 50px; }
         input { padding: 12px; font-size: 1rem; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: white; outline: none; text-align: center; }
         button { padding: 12px 24px; font-size: 1rem; font-weight: bold; border-radius: 8px; border: none; background: var(--primary); color: white; cursor: pointer; transition: 0.2s; }
         button:active { transform: scale(0.95); opacity: 0.8; }
+        .btn-secondary { background: #475569; margin-top: 10px; }
         
-        /* Game UI */
-        #gameArea { display: none; margin-top: 20px; }
+        /* Game Area */
+        #gameArea { display: none; margin-top: 10px; width: 100%; max-width: 400px; }
         .info-panel { background: #1e293b; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        
+        /* Scoreboard */
+        .scoreboard { display: flex; justify-content: space-around; font-size: 1.2rem; font-weight: bold; margin: 10px 0; background: #0f172a; padding: 10px; border-radius: 8px; }
+        .score-x { color: var(--x-color); }
+        .score-o { color: var(--o-color); }
+
         .grid { display: grid; grid-template-columns: repeat(3, 90px); gap: 8px; justify-content: center; }
         .cell { width: 90px; height: 90px; background: #1e293b; border-radius: 12px; font-size: 2.5rem; font-weight: bold; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: background 0.2s; }
         .cell:active { background: #334155; }
         
-        /* Modals/Alerts */
+        #rematchBtn { display: none; background: #10b981; width: 100%; margin-top: 15px; }
         #notification { color: #facc15; font-weight: bold; margin-top: 15px; height: 20px; }
     </style>
 </head>
@@ -31,25 +38,34 @@
     <h2>Pro Tic-Tac-Toe</h2>
     
     <div id="lobby">
-        <input type="text" id="roomInput" placeholder="Enter Room Code" autocomplete="off">
+        <input type="text" id="roomInput" placeholder="Enter Room Code (e.g. LAGOS)" autocomplete="off">
         <button onclick="joinRoom()">Join / Create Room</button>
         <div id="lobbyError" style="color: #ef4444; margin-top: 10px;"></div>
     </div>
 
     <div id="gameArea">
         <div class="info-panel">
-            <div id="roomDisplay">Room: ---</div>
+            <div id="roomDisplay" style="font-weight: bold; font-size: 1.1rem;">Room: ---</div>
+            <button class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="copyCode()">📋 Copy Code</button>
+            
+            <div class="scoreboard">
+                <div class="score-x" id="scoreX">X: 0</div>
+                <div class="score-o" id="scoreO">O: 0</div>
+            </div>
+
             <div id="playerDisplay">You are: ---</div>
-            <div id="statusDisplay">Waiting for opponent...</div>
+            <div id="statusDisplay" style="margin-top: 10px;">Waiting for opponent...</div>
         </div>
+
         <div class="grid" id="grid"></div>
+        <button id="rematchBtn" onclick="requestRematch()">🔄 Play Rematch</button>
         <div id="notification"></div>
-        <button onclick="location.reload()" style="margin-top: 20px; background: #475569;">Leave Room</button>
+        <button class="btn-secondary" onclick="location.reload()" style="width: 100%;">Leave Room</button>
     </div>
 
     <script>
-        // UPDATE TO YOUR RENDER URL IN PRODUCTION
-        const socket = io("https://tictactoe-bt0d.onrender.com"); 
+        // CHANGE TO YOUR RENDER URL
+        const socket = ("https://tictactoe-bt0d.onrender.com"); 
         
         let mySymbol = '';
         let currentRoom = '';
@@ -62,9 +78,12 @@
         const statusDisplay = document.getElementById('statusDisplay');
         const playerDisplay = document.getElementById('playerDisplay');
         const roomDisplay = document.getElementById('roomDisplay');
+        const scoreX = document.getElementById('scoreX');
+        const scoreO = document.getElementById('scoreO');
+        const rematchBtn = document.getElementById('rematchBtn');
         const notification = document.getElementById('notification');
 
-        // Initialize Board UI
+        // Initialize Board
         for (let i = 0; i < 9; i++) {
             const cell = document.createElement('div');
             cell.className = 'cell';
@@ -79,6 +98,15 @@
             socket.emit('joinRoom', currentRoom);
         }
 
+        function copyCode() {
+            navigator.clipboard.writeText(currentRoom);
+            alert("Room code copied! Send it to your friend.");
+        }
+
+        function requestRematch() {
+            socket.emit('rematch', currentRoom);
+        }
+
         // Socket Listeners
         socket.on('joined', (data) => {
             mySymbol = data.symbol;
@@ -86,10 +114,13 @@
             gameArea.style.display = 'block';
             roomDisplay.innerText = `Room: ${data.roomId}`;
             playerDisplay.innerText = `You are: Player ${mySymbol}`;
-            playerDisplay.style.color = mySymbol === 'X' ? 'var(--x-color)' : 'var(--o-color)';
         });
 
         socket.on('gameState', (data) => {
+            // Update Scores
+            scoreX.innerText = `X: ${data.scores.X}`;
+            scoreO.innerText = `O: ${data.scores.O}`;
+
             // Update Board
             const cells = document.querySelectorAll('.cell');
             data.board.forEach((val, i) => {
@@ -97,28 +128,34 @@
                 cells[i].style.color = val === 'X' ? 'var(--x-color)' : 'var(--o-color)';
             });
 
+            rematchBtn.style.display = 'none'; // Hide rematch button initially
+
             // Update Game Status
             if (data.playersCount < 2) {
                 statusDisplay.innerText = "Waiting for opponent to join...";
                 statusDisplay.style.color = "#facc15";
             } else if (data.winner) {
+                rematchBtn.style.display = 'block'; // Show rematch button!
+                
                 if (data.winner === 'Draw') {
-                    statusDisplay.innerText = "It's a Draw!";
+                    statusDisplay.innerText = "It's a Draw! 🤝";
                     statusDisplay.style.color = "white";
                 } else {
-                    statusDisplay.innerText = `Player ${data.winner} Wins!`;
-                    statusDisplay.style.color = data.winner === mySymbol ? "var(--o-color)" : "var(--x-color)";
+                    const iWon = data.winner === mySymbol;
+                    statusDisplay.innerText = iWon ? "You Win! 🎉" : "You Lost! 💀";
+                    statusDisplay.style.color = iWon ? "#10b981" : "#ef4444";
                 }
             } else {
                 const isMyTurn = data.currentTurn === mySymbol;
                 statusDisplay.innerText = isMyTurn ? "Your Turn!" : "Opponent's Turn...";
-                statusDisplay.style.color = isMyTurn ? "var(--o-color)" : "#94a3b8";
+                statusDisplay.style.color = isMyTurn ? "#10b981" : "#94a3b8";
             }
         });
 
         socket.on('playerLeft', (msg) => {
             notification.innerText = msg;
             statusDisplay.innerText = "Game Over - Opponent Fled";
+            rematchBtn.style.display = 'none';
         });
 
         socket.on('error', (msg) => {
