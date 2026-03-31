@@ -1,166 +1,100 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pro Tic-Tac-Toe</title>
+    <title>Tic Tac Toe Pro</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        :root { --bg: #0f172a; --text: #f8fafc; --primary: #3b82f6; --x-color: #ef4444; --o-color: #10b981; }
-        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); text-align: center; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        
-        /* Lobby */
-        #lobby { display: flex; flex-direction: column; gap: 10px; margin-top: 50px; }
-        input { padding: 12px; font-size: 1rem; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: white; outline: none; text-align: center; }
-        button { padding: 12px 24px; font-size: 1rem; font-weight: bold; border-radius: 8px; border: none; background: var(--primary); color: white; cursor: pointer; transition: 0.2s; }
-        button:active { transform: scale(0.95); opacity: 0.8; }
-        .btn-secondary { background: #475569; margin-top: 10px; }
-        
-        /* Game Area */
-        #gameArea { display: none; margin-top: 10px; width: 100%; max-width: 400px; }
-        .info-panel { background: #1e293b; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        
-        /* Scoreboard */
-        .scoreboard { display: flex; justify-content: space-around; font-size: 1.2rem; font-weight: bold; margin: 10px 0; background: #0f172a; padding: 10px; border-radius: 8px; }
-        .score-x { color: var(--x-color); }
-        .score-o { color: var(--o-color); }
-
-        .grid { display: grid; grid-template-columns: repeat(3, 90px); gap: 8px; justify-content: center; }
-        .cell { width: 90px; height: 90px; background: #1e293b; border-radius: 12px; font-size: 2.5rem; font-weight: bold; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: background 0.2s; }
-        .cell:active { background: #334155; }
-        
-        #rematchBtn { display: none; background: #10b981; width: 100%; margin-top: 15px; }
-        #notification { color: #facc15; font-weight: bold; margin-top: 15px; height: 20px; }
+        :root { --bg: #0f172a; --card: #1e293b; --primary: #3b82f6; --x: #ef4444; --o: #10b981; }
+        body { font-family: sans-serif; background: var(--bg); color: white; text-align: center; padding: 20px; }
+        .hidden { display: none !important; }
+        input { padding: 12px; border-radius: 8px; border: 1px solid #334155; background: var(--card); color: white; margin-bottom: 10px; width: 80%; }
+        button { padding: 12px 20px; border-radius: 8px; border: none; background: var(--primary); color: white; font-weight: bold; cursor: pointer; }
+        .grid { display: grid; grid-template-columns: repeat(3, 90px); gap: 10px; justify-content: center; margin: 20px 0; }
+        .cell { width: 90px; height: 90px; background: var(--card); border-radius: 12px; font-size: 2rem; font-weight: bold; display: flex; align-items: center; justify-content: center; }
+        .scoreboard { display: flex; justify-content: space-around; background: var(--card); padding: 15px; border-radius: 12px; margin-bottom: 20px; }
+        #status { margin: 10px 0; font-weight: bold; color: #facc15; }
     </style>
 </head>
 <body>
 
-    <h2>Pro Tic-Tac-Toe</h2>
-    
     <div id="lobby">
-        <input type="text" id="roomInput" placeholder="Enter Room Code (e.g. LAGOS)" autocomplete="off">
-        <button onclick="joinRoom()">Join / Create Room</button>
-        <div id="lobbyError" style="color: #ef4444; margin-top: 10px;"></div>
+        <h2>Enter Room Code</h2>
+        <input type="text" id="roomInput" placeholder="Ex: MONKEY">
+        <br>
+        <button onclick="join()">Join Game</button>
     </div>
 
-    <div id="gameArea">
-        <div class="info-panel">
-            <div id="roomDisplay" style="font-weight: bold; font-size: 1.1rem;">Room: ---</div>
-            <button class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="copyCode()">📋 Copy Code</button>
-            
-            <div class="scoreboard">
-                <div class="score-x" id="scoreX">X: 0</div>
-                <div class="score-o" id="scoreO">O: 0</div>
-            </div>
-
-            <div id="playerDisplay">You are: ---</div>
-            <div id="statusDisplay" style="margin-top: 10px;">Waiting for opponent...</div>
+    <div id="game" class="hidden">
+        <div class="scoreboard">
+            <div style="color: var(--x)">X: <span id="scoreX">0</span></div>
+            <div id="roomTitle">Room: --</div>
+            <div style="color: var(--o)">O: <span id="scoreO">0</span></div>
         </div>
-
+        <div id="status">Waiting for opponent...</div>
         <div class="grid" id="grid"></div>
-        <button id="rematchBtn" onclick="requestRematch()">🔄 Play Rematch</button>
-        <div id="notification"></div>
-        <button class="btn-secondary" onclick="location.reload()" style="width: 100%;">Leave Room</button>
+        <button id="rematchBtn" class="hidden" onclick="rematch()" style="background: var(--o); margin-bottom: 10px;">Play Again</button>
+        <br>
+        <button onclick="location.reload()" style="background: #475569;">Exit Room</button>
     </div>
 
     <script>
-        // CHANGE TO YOUR RENDER URL
-        const socket = ("https://tictactoe-bt0d.onrender.com"); 
+        // CHANGE THIS TO YOUR RENDER URL (Keep the https://)
+        const SERVER_URL = "https://tictactoe-bt0d.onrender.com"; 
         
-        let mySymbol = '';
-        let currentRoom = '';
+        // FIX: Using io() correctly
+        const socket = io(SERVER_URL); 
+        
+        let mySymbol, roomCode;
 
-        // DOM Elements
-        const lobby = document.getElementById('lobby');
-        const gameArea = document.getElementById('gameArea');
-        const grid = document.getElementById('grid');
-        const roomInput = document.getElementById('roomInput');
-        const statusDisplay = document.getElementById('statusDisplay');
-        const playerDisplay = document.getElementById('playerDisplay');
-        const roomDisplay = document.getElementById('roomDisplay');
-        const scoreX = document.getElementById('scoreX');
-        const scoreO = document.getElementById('scoreO');
-        const rematchBtn = document.getElementById('rematchBtn');
-        const notification = document.getElementById('notification');
-
-        // Initialize Board
-        for (let i = 0; i < 9; i++) {
-            const cell = document.createElement('div');
-            cell.className = 'cell';
-            cell.onclick = () => socket.emit('makeMove', { roomId: currentRoom, index: i });
-            grid.appendChild(cell);
+        // Create Grid
+        const gridDiv = document.getElementById('grid');
+        for(let i=0; i<9; i++) {
+            const div = document.createElement('div');
+            div.className = 'cell';
+            div.onclick = () => socket.emit('makeMove', { roomId: roomCode, index: i });
+            gridDiv.appendChild(div);
         }
 
-        function joinRoom() {
-            const roomCode = roomInput.value.trim().toUpperCase();
-            if (!roomCode) return;
-            currentRoom = roomCode;
-            socket.emit('joinRoom', currentRoom);
+        function join() {
+            roomCode = document.getElementById('roomInput').value.toUpperCase();
+            if(roomCode) socket.emit('joinRoom', roomCode);
         }
 
-        function copyCode() {
-            navigator.clipboard.writeText(currentRoom);
-            alert("Room code copied! Send it to your friend.");
+        function rematch() {
+            socket.emit('rematch', roomCode);
         }
 
-        function requestRematch() {
-            socket.emit('rematch', currentRoom);
-        }
-
-        // Socket Listeners
-        socket.on('joined', (data) => {
+        socket.on('joined', data => {
             mySymbol = data.symbol;
-            lobby.style.display = 'none';
-            gameArea.style.display = 'block';
-            roomDisplay.innerText = `Room: ${data.roomId}`;
-            playerDisplay.innerText = `You are: Player ${mySymbol}`;
+            roomCode = data.roomId;
+            document.getElementById('lobby').classList.add('hidden');
+            document.getElementById('game').classList.remove('hidden');
+            document.getElementById('roomTitle').innerText = roomCode;
         });
 
-        socket.on('gameState', (data) => {
-            // Update Scores
-            scoreX.innerText = `X: ${data.scores.X}`;
-            scoreO.innerText = `O: ${data.scores.O}`;
-
-            // Update Board
+        socket.on('gameState', room => {
+            document.getElementById('scoreX').innerText = room.scores.X;
+            document.getElementById('scoreO').innerText = room.scores.O;
+            
             const cells = document.querySelectorAll('.cell');
-            data.board.forEach((val, i) => {
+            room.board.forEach((val, i) => {
                 cells[i].innerText = val || '';
-                cells[i].style.color = val === 'X' ? 'var(--x-color)' : 'var(--o-color)';
+                cells[i].style.color = val === 'X' ? 'var(--x)' : 'var(--o)';
             });
 
-            rematchBtn.style.display = 'none'; // Hide rematch button initially
-
-            // Update Game Status
-            if (data.playersCount < 2) {
-                statusDisplay.innerText = "Waiting for opponent to join...";
-                statusDisplay.style.color = "#facc15";
-            } else if (data.winner) {
-                rematchBtn.style.display = 'block'; // Show rematch button!
-                
-                if (data.winner === 'Draw') {
-                    statusDisplay.innerText = "It's a Draw! 🤝";
-                    statusDisplay.style.color = "white";
-                } else {
-                    const iWon = data.winner === mySymbol;
-                    statusDisplay.innerText = iWon ? "You Win! 🎉" : "You Lost! 💀";
-                    statusDisplay.style.color = iWon ? "#10b981" : "#ef4444";
-                }
+            const rematchBtn = document.getElementById('rematchBtn');
+            if (room.winner) {
+                document.getElementById('status').innerText = room.winner === 'Draw' ? "Draw!" : `Winner: ${room.winner}`;
+                rematchBtn.classList.remove('hidden');
             } else {
-                const isMyTurn = data.currentTurn === mySymbol;
-                statusDisplay.innerText = isMyTurn ? "Your Turn!" : "Opponent's Turn...";
-                statusDisplay.style.color = isMyTurn ? "#10b981" : "#94a3b8";
+                rematchBtn.classList.add('hidden');
+                document.getElementById('status').innerText = room.currentTurn === mySymbol ? "Your Turn" : "Opponent's Turn";
             }
         });
 
-        socket.on('playerLeft', (msg) => {
-            notification.innerText = msg;
-            statusDisplay.innerText = "Game Over - Opponent Fled";
-            rematchBtn.style.display = 'none';
-        });
-
-        socket.on('error', (msg) => {
-            document.getElementById('lobbyError').innerText = msg;
-        });
+        socket.on('playerLeft', msg => alert(msg));
+        socket.on('error', msg => alert(msg));
     </script>
 </body>
 </html>
